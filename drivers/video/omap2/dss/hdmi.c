@@ -73,6 +73,7 @@ enum extension_edid_db {
 #define EDID_TIMING_DESCRIPTOR_SIZE		0x12
 #define EDID_DESCRIPTOR_BLOCK0_ADDRESS		0x36
 #define EDID_DESCRIPTOR_BLOCK1_ADDRESS		0x80
+#define EDID_HDMI_VENDOR_SPECIFIC_DATA_BLOCK	128
 #define EDID_SIZE_BLOCK0_TIMING_DESCRIPTOR	4
 #define EDID_SIZE_BLOCK1_TIMING_DESCRIPTOR	4
 
@@ -108,6 +109,7 @@ static struct {
 
 	u8 s3d_mode;
 	bool s3d_enable;
+	int source_physical_address;
 	u8 s3d_type;  //mo2sanghyun.lee 
 
 	void (*hdmi_start_frame_cb)(void);
@@ -385,6 +387,23 @@ void hdmi_get_monspecs(struct fb_monspecs *specs)
 		specs->modedb[j++] = specs->modedb[i];
 	}
 	specs->modedb_len = j;
+
+	/* Find out the Source Physical address for the CEC
+	CEC physical address will be part of VSD block from
+	TV Physical address is 2 bytes after 24 bit IEEE
+	registration identifier (0x000C03)
+	*/
+	i = EDID_HDMI_VENDOR_SPECIFIC_DATA_BLOCK;
+	while (i < (HDMI_EDID_MAX_LENGTH - 5)) {
+		if ((edid[i] == 0x03) && (edid[i+1] == 0x0c) &&
+			(edid[i+2] == 0x00)) {
+			hdmi.source_physical_address = (edid[i+3] << 8) |
+				edid[i+4];
+			break;
+		}
+		i++;
+
+	}
 }
 
 u8 *hdmi_read_edid(struct omap_video_timings *dp)
