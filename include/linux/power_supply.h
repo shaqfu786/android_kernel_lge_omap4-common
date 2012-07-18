@@ -140,6 +140,7 @@ enum power_supply_property {
 /* LGE_CHANGE_E [jongho3.lee@lge.com] ?-?-? */
 
 	POWER_SUPPLY_PROP_TYPE, /* use power_supply.type instead */
+	POWER_SUPPLY_PROP_CHARGE_ENABLED,
 	/* Properties of type `const char *' */
 	POWER_SUPPLY_PROP_MODEL_NAME,
 	POWER_SUPPLY_PROP_MANUFACTURER,
