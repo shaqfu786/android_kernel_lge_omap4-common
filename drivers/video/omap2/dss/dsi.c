@@ -4036,6 +4036,7 @@ static int dsi_video_proto_config(struct omap_dss_device *dssdev)
 {
 	struct platform_device *dsidev = dsi_get_dsidev_from_dssdev(dssdev);
 	struct omap_video_timings *timings = &dssdev->panel.timings;
+	struct omap_dsi_timings t;
 	int buswidth = 0;
 	u32 r;
 	int bytes_per_pixel;
