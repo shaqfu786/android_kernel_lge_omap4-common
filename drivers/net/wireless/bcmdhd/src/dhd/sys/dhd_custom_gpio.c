@@ -1,8 +1,8 @@
 /*
 * Customer code to add GPIO control during WLAN start/stop
-* Copyright (C) 1999-2012, Broadcom Corporation
+* Copyright (C) 1999-2011, Broadcom Corporation
 * 
-*      Unless you and Broadcom execute a separate written software license
+*         Unless you and Broadcom execute a separate written software license
 * agreement governing use of this software, this software is licensed to you
 * under the terms of the GNU General Public License version 2 (the "GPL"),
 * available at http://www.broadcom.com/licenses/GPLv2.php, with the
@@ -20,7 +20,7 @@
 * software in any way with any other Broadcom software provided under a license
 * other than the GPL, without Broadcom's express prior written consent.
 *
-* $Id: dhd_custom_gpio.c 291086 2011-10-21 01:17:24Z $
+* $Id: dhd_custom_gpio.c 339054 2012-06-15 04:56:55Z $
 */
 
 #include <typedefs.h>
@@ -33,7 +33,6 @@
 
 #include <wlioctl.h>
 #include <wl_iw.h>
-
 
 #define WL_ERROR(x) printf x
 #define WL_TRACE(x)
@@ -95,16 +94,16 @@ int dhd_customer_oob_irq_map(unsigned long *irq_flags_ptr)
 	if (dhd_oob_gpio_num < 0) {
 		dhd_oob_gpio_num = CUSTOM_OOB_GPIO_NUM;
 	}
-#endif /* CUSTOM_OOB_GPIO_NUM */
+#endif /* CUSTOMER_HW2 */
 
 	if (dhd_oob_gpio_num < 0) {
-		WL_ERROR(("%s: ERROR customer specific Host GPIO is NOT defined \n",
-		__FUNCTION__));
+		WL_ERROR(("%s: ERROR customer specific Host GPIO is NOT defined\n",
+			__FUNCTION__));
 		return (dhd_oob_gpio_num);
 	}
 
 	WL_ERROR(("%s: customer specific Host GPIO number is (%d)\n",
-	         __FUNCTION__, dhd_oob_gpio_num));
+		__FUNCTION__, dhd_oob_gpio_num));
 
 #if defined CUSTOMER_HW
 	host_oob_irq = MSM_GPIO_TO_INT(dhd_oob_gpio_num);
@@ -131,12 +130,9 @@ dhd_customer_gpio_wlan_ctrl(int onoff)
 			bcm_wlan_power_off(2);
 #endif /* CUSTOMER_HW */
 #ifdef CUSTOMER_HW2
-			// (0,0) ->(0,200) . moon-wifi@lge.com by kwisuk.kwon, 20120418, Dongle error when Wi-Fi on
-			//wifi_set_power(0, 0); 
-			wifi_set_power(0, 200); 
+			wifi_set_power(0, 0);
 #endif
 			WL_ERROR(("=========== WLAN placed in RESET ========\n"));
-
 		break;
 
 		case WLAN_RESET_ON:
@@ -146,10 +142,7 @@ dhd_customer_gpio_wlan_ctrl(int onoff)
 			bcm_wlan_power_on(2);
 #endif /* CUSTOMER_HW */
 #ifdef CUSTOMER_HW2
-			// (0,0) ->(0,200) . moon-wifi@lge.com by kwisuk.kwon, 20120418, Dongle error when Wi-Fi on
-			//wifi_set_power(1, 0);
-			wifi_set_power(1, 200);
-
+			wifi_set_power(1, 0);
 #endif
 			WL_ERROR(("=========== WLAN going back to live  ========\n"));
 		break;
@@ -160,7 +153,6 @@ dhd_customer_gpio_wlan_ctrl(int onoff)
 #ifdef CUSTOMER_HW
 			bcm_wlan_power_off(1);
 #endif /* CUSTOMER_HW */
-
 		break;
 
 		case WLAN_POWER_ON:
@@ -171,7 +163,6 @@ dhd_customer_gpio_wlan_ctrl(int onoff)
 			/* Lets customer power to get stable */
 			OSL_DELAY(200);
 #endif /* CUSTOMER_HW */
-
 		break;
 	}
 }
@@ -298,5 +289,5 @@ void get_customized_country_code(char *country_iso_code, wl_country_t *cspec)
 	cspec->rev = translate_custom_table[0].custom_locale_rev;
 #endif /* EXMAPLE_TABLE */
 	return;
-#endif /* defined(CUSTOMER_HW2) && (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 36)) */
+#endif /* defined(CUSTOMER_HW2) && (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)) */
 }
