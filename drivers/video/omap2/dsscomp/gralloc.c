@@ -17,6 +17,31 @@
 #include <linux/earlysuspend.h>
 #endif
 static bool blanked;
+static u32 dev_display_mask;
+
+#include <linux/ion.h>
+#include <plat/dma.h>
+
+extern struct ion_device *omap_ion_device;
+struct workqueue_struct *clone_wq;
+
+struct dsscomp_dma_config {
+	u32 src_buf_addr;
+	u32 dst_buf_addr;
+	u32 width;
+	u32 height;
+	u32 stride;
+};
+
+struct dsscomp_clone_work {
+	struct work_struct work;
+	struct dsscomp_dma_config dma_cfg;
+	dsscomp_t comp;
+};
+
+wait_queue_head_t transfer_waitq;
+wait_queue_head_t dma_waitq;
+static bool dma_transfer_done;
 
 static struct tiler1d_slot {
 	struct list_head q;
@@ -251,7 +276,7 @@ static void dsscomp_gralloc_do_clone(struct work_struct *work)
 	dsscomp_gralloc_transfer_dmabuf(wk->dma_cfg);
 #ifdef CONFIG_DEBUG_FS
 	ms2 = ktime_to_ms(ktime_get());
-	dev_info(DEV(cdev), "DMA latency(msec) = %lld\n", ms2-ms1);
+	dev_info(DEV(cdev), "DMA latency(msec) = %d\n", ms2-ms1);
 #endif
 
 	wk->comp->state = DSSCOMP_STATE_APPLYING;
