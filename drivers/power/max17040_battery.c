@@ -20,6 +20,7 @@
 #include <linux/power_supply.h>
 #include <linux/max17040_battery.h>
 #include <linux/slab.h>
+#include <linux/android_alarm.h>
 
 #define MAX17040_VCELL_MSB	0x02
 #define MAX17040_VCELL_LSB	0x03
@@ -73,6 +74,9 @@ static int max17040_get_property(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_CAPACITY:
 		val->intval = chip->soc;
+		break;
+	case POWER_SUPPLY_PROP_CHARGE_ENABLED:
+		val->intval = chip->pdata->charger_enable();
 		break;
 	default:
 		return -EINVAL;
@@ -197,6 +201,7 @@ static enum power_supply_property max17040_battery_props[] = {
 	POWER_SUPPLY_PROP_PRESENT,
 	POWER_SUPPLY_PROP_VOLTAGE_NOW,
 	POWER_SUPPLY_PROP_CAPACITY,
+	POWER_SUPPLY_PROP_CHARGE_ENABLED,
 };
 
 static int __devinit max17040_probe(struct i2c_client *client,
