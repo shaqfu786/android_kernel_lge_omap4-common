@@ -70,6 +70,7 @@ obj-$(CONFIG_GCCORE)		+= gcx/gccore/
 obj-$(CONFIG_GCBV)		+= gcx/gcbv/
 obj-$(CONFIG_GCIOCTL)		+= gcx/gcioctl/
 obj-$(CONFIG_CACHE2DMANAGER)	+= cache-2dmanager/
+obj-$(CONFIG_UID_CPUTIME) += uid_cputime.o
 obj-$(CONFIG_COLOR_CONTROL)	+= color_control.o
 # LGE_SJIT 2011-11-29 [dojip.kim@lge.com] add tspdrv from P940 GB
 # LGE_CHANGE [seungmoon.lee@lge.com] 2011-08-18
