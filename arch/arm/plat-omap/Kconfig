@@ -262,7 +262,7 @@ config OMAP_TEMP_SENSOR
 # this carveout should probably become generic and not omap specific
 config OMAP_REMOTEPROC_MEMPOOL_SIZE
 	hex "Physical carveout memory pool size (Byte)"
-	depends on OMAP_REMOTE_PROC_IPU
+	depends on OMAP_REMOTE_PROC
 	default 0x700000
 	help
 	  Allocate specified size of memory at boot time so we can ioremap
@@ -292,6 +292,17 @@ config OMAP_PM
 	depends on PM
 	bool "OMAP PM layer implementation"
 endchoice
+
+config ION_OMAP_TILER2D_SIZE
+	int "Carveout size for tiler 2d, default 128M."
+	range 0 1024
+	depends on ION_OMAP
+	default 128
+
+config ION_OMAP_TILER_DYNAMIC_ALLOC
+	bool "Force dynamic allocation of tiler memory."
+	depends on ION_OMAP
+	default n
 
 endmenu
 
