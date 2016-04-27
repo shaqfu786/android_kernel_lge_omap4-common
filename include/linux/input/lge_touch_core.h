@@ -20,11 +20,7 @@
 
 //#define LGE_TOUCH_TIME_DEBUG
 //mo2haewoon.you@lge.com => [START] 
-#ifdef CONFIG_MACH_LGE_COSMO
 #define COSMO_TOUCHKEY_RANGE_TRIM
-#elif defined(CONFIG_MACH_LGE_CX2)
-#define CX2_TOUCHKEY_RANGE_TRIM
-#endif
 //mo2haewoon.you@lge.com <= [END]
 
 #define MAX_FINGER	10
@@ -401,20 +397,12 @@ enum{
 };
 #endif
 
-enum{
-	WORK_POST_COMPLATE = 0,
-	WORK_POST_OUT,
-	WORK_POST_ERR_RETRY,
-	WORK_POST_ERR_CIRTICAL,
-	WORK_POST_MAX,
-};
-
 #define LGE_TOUCH_NAME		"lge_touch"
 
 /* Debug Mask setting */
-//#define TOUCH_DEBUG_PRINT   (0)
+#define TOUCH_DEBUG_PRINT   (1)
 #define TOUCH_ERROR_PRINT   (1)
-//#define TOUCH_INFO_PRINT   	(0)
+#define TOUCH_INFO_PRINT   	(1)
 
 #if defined(TOUCH_INFO_PRINT)
 #define TOUCH_INFO_MSG(fmt, args...) \
