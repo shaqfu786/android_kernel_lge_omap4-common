@@ -1500,6 +1500,7 @@ fail:
 	if (status < 0)
 		twl_remove(client);
 	return status;
+#endif
 }
 
 static const struct i2c_device_id twl_ids[] = {
