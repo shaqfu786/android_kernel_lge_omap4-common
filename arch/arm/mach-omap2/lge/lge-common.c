@@ -23,6 +23,7 @@
 #include <linux/reboot.h>
 #include <linux/omapfb.h>
 #include <linux/memblock.h>
+#include <linux/cdc_tcxo.h>
 
 #include <plat/i2c.h>
 #include <plat/irqs.h>
@@ -37,6 +38,7 @@
 
 #include <mach/omap4-common.h>
 #include <mach/dmm.h>
+#include <mach/omap4_ion.h>
 
 #include <mach-omap2/pm.h>
 #include <mach-omap2/mux.h>
@@ -49,6 +51,7 @@
 
 #include <video/omapdss.h>
 
+#include <plat/android-display.h>
 #include <lge/board.h>
 #include <lge/common.h>
 
@@ -720,9 +723,24 @@ void __init lge_common_map_io(void)
 
 void __init lge_common_reserve(void)
 {
-	/* LGE_SJIT 2012-02-06 [dojip.kim@lge.com]
-	 * need to align 1M for lge panic handler
-	 */
+	omap_init_ram_size();
+
+#ifdef CONFIG_ION_OMAP
+	omap_android_display_setup(&lge_machine_data.dss_board,
+					NULL,
+					NULL,
+					&fb_pdata,
+					get_omap_ion_platform_data());
+
+	omap_ion_init();
+#else
+	omap_android_display_setup(&lge_machine_data.dss_board,
+					NULL,
+					NULL,
+					&fb_pdata,
+					get_omap_ion_platform_data());
+#endif
+
 	omap_ram_console_init(LGE_RAM_CONSOLE_START_DEFAULT,
 			ALIGN(LGE_RAM_CONSOLE_SIZE_DEFAULT, SZ_1M));
 
@@ -730,22 +748,10 @@ void __init lge_common_reserve(void)
 	memblock_remove(PHYS_ADDR_SMC_MEM, PHYS_ADDR_SMC_SIZE);
 	memblock_remove(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE);
 	/* ipu needs to recognize secure input buffer area as well */
-#if defined(CONFIG_MACH_LGE_COSMO)	
-	omap_ipu_set_static_mempool(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE +
+	omap_ipu_set_static_mempool(PHYS_ADDR_DUCATI_MEM,
+					PHYS_ADDR_DUCATI_SIZE +
 					OMAP4_ION_HEAP_SECURE_INPUT_SIZE);
-#else
-	omap_ipu_set_static_mempool(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE +
-					SZ_1M*90);
-#endif
-#ifdef CONFIG_OMAP_REMOTE_PROC_DSP
-	memblock_remove(PHYS_ADDR_TESLA_MEM, PHYS_ADDR_TESLA_SIZE);
-	omap_dsp_set_static_mempool(PHYS_ADDR_TESLA_MEM,
-					PHYS_ADDR_TESLA_SIZE);
-#endif
 
-#ifdef CONFIG_ION_OMAP
-	omap_ion_init();
-#endif
 	omap_reserve();
 }
 
