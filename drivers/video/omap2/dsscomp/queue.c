@@ -409,8 +409,7 @@ void dsscomp_drop(dsscomp_t comp)
 	if (debug & DEBUG_COMPOSITIONS)
 		dev_info(DEV(cdev), "[%p] released\n", comp);
 
-	//DO_IF_DEBUG_FS(list_del(&comp->dbg_q));
-	DO_IF_DEBUG_FS({if (comp->dbg_q.next != LIST_POISON1 && comp->dbg_q.prev != LIST_POISON2) {list_del(&comp->dbg_q);}});
+	DO_IF_DEBUG_FS(list_del(&comp->dbg_q));
 
 	kfree(comp);
 }
@@ -524,7 +523,6 @@ int dsscomp_apply(dsscomp_t comp)
 
 	BUG_ON(comp->state != DSSCOMP_STATE_APPLYING);
 
-	log_event(20*comp->ix + 20, 0, comp, "dsscomp_apply entered", 0, 0);
 	/* check if the display is valid and used */
 	r = -ENODEV;
 	d = &comp->frm;
@@ -861,7 +859,6 @@ skip_ovl_set:
 	}
 
 done:
-	log_event(20*comp->ix + 20, 0, comp, "dsscomp_apply done", 0, 0);
 	return r;
 }
 EXPORT_SYMBOL(dsscomp_apply);

@@ -885,7 +885,8 @@ struct omap_dss_driver {
 	/* for wrapping around state changes */
 	void (*disable_orig)(struct omap_dss_device *display);
 	int (*enable_orig)(struct omap_dss_device *display);
-#if 1 //##defined(3D_LCD_FUNCTION)
+	int (*suspend_orig)(struct omap_dss_device *display);
+#ifdef CONFIG_MACH_LGE_COSMO_3D_DISPLAY
 /* S3D specific */
 /* Used for displays that can switch 3D mode on/off
 3D only displays should return non-zero value when trying to disable */

@@ -677,6 +677,13 @@ bool dispc_go_busy(enum omap_channel channel)
 		return REG_GET(DISPC_CONTROL, bit, bit) == 1;
 }
 
+#if defined(CONFIG_LGE_HANDLE_PANIC) && defined(CONFIG_MACH_LGE_COSMO)
+//mo2haewoon.you@lge.com => [START]  HIDDEN_RESET
+// Hidden reset skip code
+extern int lh430wv2_panel_HiddenRestStatus( int CheckMode );
+//mo2haewoon.you@lge.com <= [END]
+#endif
+
 void dispc_go(enum omap_channel channel)
 {
 	int bit;
@@ -1604,8 +1611,9 @@ static void _dispc_set_scaling_common(enum omap_plane plane,
 	int accu0 = 0;
 	int accu1 = 0;
 	u32 l;
+	u16 y_adjust = color_mode == OMAP_DSS_COLOR_NV12 ? 2 : 0;
 
-	_dispc_set_scale_param(plane, orig_width, orig_height,
+	_dispc_set_scale_param(plane, orig_width, orig_height - y_adjust,
 				out_width, out_height, five_taps,
 				rotation, DISPC_COLOR_COMPONENT_RGB_Y);
 	l = dispc_read_reg(DISPC_OVL_ATTRIBUTES(plane));
@@ -2649,6 +2657,18 @@ int dispc_enable_plane(enum omap_plane plane, bool enable)
 
 	return 0;
 }
+
+void dispc_setup_wb_source(enum omap_writeback_source source)
+{
+	/* configure wb source */
+	if (source == OMAP_WB_TV)
+		REG_FLD_MOD(DISPC_OVL_ATTRIBUTES(OMAP_DSS_WB), 2, 18, 16);
+	else if (source == OMAP_WB_LCD2)
+		REG_FLD_MOD(DISPC_OVL_ATTRIBUTES(OMAP_DSS_WB), 1, 18, 16);
+	else
+		REG_FLD_MOD(DISPC_OVL_ATTRIBUTES(OMAP_DSS_WB), source, 18, 16);
+}
+
 /* Writeback*/
 int dispc_setup_wb(struct writeback_cache_data *wb)
 {
@@ -2704,13 +2724,7 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 	if (cconv == 1 && color_mode == OMAP_DSS_COLOR_NV12)
 		maxdownscale = 2;
 
-	/* configure wb source */
-	if (source == OMAP_WB_TV)
-		REG_FLD_MOD(DISPC_OVL_ATTRIBUTES(plane), 2, 18, 16);
-	else if (source == OMAP_WB_LCD2)
-		REG_FLD_MOD(DISPC_OVL_ATTRIBUTES(plane), 1, 18, 16);
-	else
-		REG_FLD_MOD(DISPC_OVL_ATTRIBUTES(plane), source, 18, 16);
+	dispc_setup_wb_source(source);
 
 	/* change resolution of manager if it works in MEM2MEM mode */
 	if (wb->mode == OMAP_WB_MEM2MEM_MODE) {
