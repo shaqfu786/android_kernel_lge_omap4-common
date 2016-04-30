@@ -2385,8 +2385,8 @@ static struct omap_dss_driver lh430wv2_panel_driver = {
 	.memory_read	= lh430wv2_panel_memory_read,
 
 	.get_timings	= lh430wv2_panel_get_timings,
-	.enable_s3d 	 = lh430wv2_panel_enable_s3d,
-	.get_s3d_enabled = lh430wv2_panel_get_s3d_enabled,
+	//.enable_s3d 	 = lh430wv2_panel_enable_s3d,
+	//.get_s3d_enabled = lh430wv2_panel_get_s3d_enabled,
 	.driver         = {
 		.name 	= "lh430wv2_panel",
 		.owner  = THIS_MODULE,
