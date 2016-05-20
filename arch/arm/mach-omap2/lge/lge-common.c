@@ -730,13 +730,17 @@ static struct sgx_omaplfb_platform_data lge_omaplfb_plat_data = {
 	.configs = lge_omaplfb_config,
 };
 
+static struct dsscomp_platform_data lge_dsscomp_plat_data = {
+		.tiler1d_slotsz = SZ_16M,
+};
+
 void __init lge_common_reserve(void)
 {
 	omap_init_ram_size();
 
 #ifdef CONFIG_ION_OMAP
 	omap_android_display_setup(&lge_machine_data.dss_board,
-					NULL,
+					&lge_dsscomp_plat_data,
 					&lge_omaplfb_plat_data,
 					&fb_pdata,
 					get_omap_ion_platform_data());
@@ -744,7 +748,7 @@ void __init lge_common_reserve(void)
 	omap_ion_init();
 #else
 	omap_android_display_setup(&lge_machine_data.dss_board,
-					NULL,
+					&lge_dsscomp_plat_data,
 					&lge_omaplfb_plat_data,
 					&fb_pdata,
 					get_omap_ion_platform_data());
