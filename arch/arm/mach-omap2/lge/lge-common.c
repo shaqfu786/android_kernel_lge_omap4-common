@@ -31,7 +31,6 @@
 #include <plat/omap4-keypad.h>
 #include <plat/omap-serial.h>
 #include <plat/usb.h>
-#include <plat/vram.h>
 #include <plat/remoteproc.h>
 #include <plat/omap-pm.h>
 
@@ -388,7 +387,6 @@ static void lge_common_display_init(void)
 
 	if (lge_machine_data.fb_pdata)
 		fb = lge_machine_data.fb_pdata;
-	omap_vram_set_sdram_vram(fb->mem_desc.region[0].size, 0);
 	omapfb_set_platform_data(fb);
 
 	if (lge_machine_data.dss_board != NULL)
