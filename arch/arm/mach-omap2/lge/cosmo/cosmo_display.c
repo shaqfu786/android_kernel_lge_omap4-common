@@ -210,11 +210,8 @@ lge_machine_initcall(cosmo_dss_init);
  * Align_2M((Align_60K(800*4096) = 3317760) * 2) = 8MB
  * => Three buffer requires framework support (current two buffer support)
  */
-#ifdef CONFIG_COSMO_ICS_MEM_OPT
-#define FB_RAM_SIZE	(3*1024*1024) /* Align_60K (800 * 4096) * 2 */
-#else
 #define FB_RAM_SIZE	(8*1024*1024) /* Align_60K (800 * 4096) * 2 */
-#endif
+
 static struct omapfb_platform_data fb_pdata = {
 	.mem_desc = {
 		.region_cnt = 1,

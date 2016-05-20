@@ -28,16 +28,6 @@ struct cmdline_parameter {
 
 static struct cmdline_parameter cmdline_parameters[] __initdata = {
 	{"mem", "512M@0x80000000", 0},
-#if defined(CONFIG_MACH_LGE_COSMO_3D_DISPLAY)  //##hwcho_20120522
-#ifdef CONFIG_COSMO_ICS_MEM_OPT
-	{"vram", "3M,0x9a700000", 0},
-#else
-	{"vram", "16M,0x9a700000", 0},
-#endif //##
-#else
-	{"vram", "8M", 0},  
-#endif //##
-	{"omapfb.vram", "0:3M@0x9a700000", 0},
 };
 
 #ifdef NO_CONSOLE_SUSPEND

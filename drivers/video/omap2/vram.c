@@ -551,7 +551,7 @@ void __init omap_vram_reserve_sdram_memblock(void)
 	if (!size)
 		return;
 
-	size = ALIGN(size, SZ_1M);
+	size = ALIGN(size, SZ_2M);
 
 	if (paddr) {
 		if (paddr & ~PAGE_MASK) {
@@ -576,7 +576,7 @@ void __init omap_vram_reserve_sdram_memblock(void)
 			return;
 		}
 	} else {
-		paddr = memblock_alloc(size, SZ_1M);
+		paddr = memblock_alloc(size, SZ_2M);
 	}
 
 	memblock_free(paddr, size);
@@ -584,11 +584,7 @@ void __init omap_vram_reserve_sdram_memblock(void)
 
 	omap_vram_add_region(paddr, size);
 
-#if defined(CONFIG_MACH_LGE_COSMO)
-	pr_info("Reserving %u bytes SDRAM for VRAM at address 0x%x\n", size,paddr);
-#else
 	pr_info("Reserving %u bytes SDRAM for VRAM\n", size);
-#endif
 }
 
 /*
@@ -654,7 +650,6 @@ void __init omap_vram_set_sdram_vram(u32 size, u32 start)
 {
 	omap_vram_sdram_start = start;
 	omap_vram_sdram_size = size;
-	printk("omap_vram_set_sdram_vram() omap_vram_sdram_start =0x%x, omap_vram_sdram_size=0x%x.\n", start, size);
 }
 
 void __init omap_vram_set_sram_vram(u32 size, u32 start)
