@@ -363,16 +363,9 @@ int __init lge_set_i2c_bus_info(struct lge_i2c_config *cfg)
 static bool enable_suspend_off = true;
 module_param(enable_suspend_off, bool, S_IRUSR | S_IRGRP | S_IROTH);
 
-#define FB_RAM_SIZE                20*1024*1024 /* Align_60K(800 * 4096) * 3 */
-
 static struct omapfb_platform_data fb_pdata = {
 	.mem_desc = {
 		.region_cnt = 1,
-		.region = {
-			[0] = {
-				.size = FB_RAM_SIZE,
-			},
-		},
 	},
 };
 

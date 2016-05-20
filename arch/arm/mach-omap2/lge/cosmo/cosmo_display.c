@@ -204,22 +204,9 @@ int __init cosmo_dss_init(void)
 
 lge_machine_initcall(cosmo_dss_init);
 
-/* LGE_SJIT 2012-1-13 [jongrak.kwon@lge.com]
- * Set the FB size to 10MB for upto three buffers for COSMO 
- * Set the FB size to 8MB for upto two buffers for COSMO
- * Align_2M((Align_60K(800*4096) = 3317760) * 2) = 8MB
- * => Three buffer requires framework support (current two buffer support)
- */
-#define FB_RAM_SIZE	(8*1024*1024) /* Align_60K (800 * 4096) * 2 */
-
 static struct omapfb_platform_data fb_pdata = {
 	.mem_desc = {
 		.region_cnt = 1,
-		.region = {
-			[0] = {
-				.size = FB_RAM_SIZE,
-			},
-		},
 	},
 };
 
