@@ -712,6 +712,24 @@ void __init lge_common_map_io(void)
 	omap44xx_map_common_io();
 }
 
+#if defined(CONFIG_FB_OMAP2_NUM_FBS)
+#define OMAPLFB_NUM_DEV CONFIG_FB_OMAP2_NUM_FBS
+#else
+#define OMAPLFB_NUM_DEV 1
+#endif
+
+static struct sgx_omaplfb_config lge_omaplfb_config[OMAPLFB_NUM_DEV] = {
+	{
+		.vram_buffers = 2,
+		.swap_chain_length = 2,
+	}
+};
+
+static struct sgx_omaplfb_platform_data lge_omaplfb_plat_data = {
+	.num_configs = OMAPLFB_NUM_DEV,
+	.configs = lge_omaplfb_config,
+};
+
 void __init lge_common_reserve(void)
 {
 	omap_init_ram_size();
@@ -719,7 +737,7 @@ void __init lge_common_reserve(void)
 #ifdef CONFIG_ION_OMAP
 	omap_android_display_setup(&lge_machine_data.dss_board,
 					NULL,
-					NULL,
+					&lge_omaplfb_plat_data,
 					&fb_pdata,
 					get_omap_ion_platform_data());
 
@@ -727,7 +745,7 @@ void __init lge_common_reserve(void)
 #else
 	omap_android_display_setup(&lge_machine_data.dss_board,
 					NULL,
-					NULL,
+					&lge_omaplfb_plat_data,
 					&fb_pdata,
 					get_omap_ion_platform_data());
 #endif
