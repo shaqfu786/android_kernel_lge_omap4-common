@@ -102,14 +102,21 @@ void __init omap_ion_init(void)
 	system_512m = (omap_total_ram_size() == SZ_512M);
 
 	/* carveout sizes */
+#ifdef CONFIG_MACH_LGE_COSMO
+	omap4_smc_size = 0;
+#else
 	omap4_smc_size = (SZ_1M * 3);
-
+#endif
 	omap4_ion_heap_nonsec_tiler_mem_size = 0;
 	omap4_ion_heap_tiler_mem_size = 0;
 
 	if (system_512m) {
 		omap4_ion_heap_secure_input_size = 0;
+#ifdef CONFIG_MACH_LGE_COSMO
+		omap4_ducati_heap_size = (SZ_1M * 85);
+#else
 		omap4_ducati_heap_size = (SZ_1M * 83);
+#endif
 	} else {
 		omap4_ion_heap_secure_input_size = (SZ_1M * 90);
 		omap4_ducati_heap_size = (SZ_1M * 105);
