@@ -238,9 +238,8 @@ int propagate_mnt(struct vfsmount *dest_mnt, struct dentry *dest_dentry,
 
 		source =  get_source(m, prev_dest_mnt, prev_src_mnt, &type);
 
-		child = copy_tree(source, source->mnt_root, type);
-		if (IS_ERR(child)) {
-			ret = PTR_ERR(child);
+		if (!(child = copy_tree(source, source->mnt_root, type))) {
+			ret = -ENOMEM;
 			list_splice(tree_list, tmp_list.prev);
 			goto out;
 		}

@@ -693,57 +693,53 @@ static struct vfsmount *clone_mnt(struct vfsmount *old, struct dentry *root,
 					int flag)
 {
 	struct super_block *sb = old->mnt_sb;
-	struct vfsmount *mnt;
-	int err;
+	struct vfsmount *mnt = alloc_vfsmnt(old->mnt_devname);
 
-	mnt = alloc_vfsmnt(old->mnt_devname);
-	if (!mnt)
-		return ERR_PTR(-ENOMEM);
+	if (mnt) {
+		if (flag & (CL_SLAVE | CL_PRIVATE))
+			mnt->mnt_group_id = 0; /* not a peer of original */
+		else
+			mnt->mnt_group_id = old->mnt_group_id;
 
-	if (flag & (CL_SLAVE | CL_PRIVATE))
-		mnt->mnt_group_id = 0; /* not a peer of original */
-	else
-		mnt->mnt_group_id = old->mnt_group_id;
+		if ((flag & CL_MAKE_SHARED) && !mnt->mnt_group_id) {
+			int err = mnt_alloc_group_id(mnt);
+			if (err)
+				goto out_free;
+		}
 
-	if ((flag & CL_MAKE_SHARED) && !mnt->mnt_group_id) {
-		err = mnt_alloc_group_id(mnt);
-		if (err)
-			goto out_free;
+		mnt->mnt_flags = old->mnt_flags & ~MNT_WRITE_HOLD;
+		atomic_inc(&sb->s_active);
+		mnt->mnt_sb = sb;
+		mnt->mnt_root = dget(root);
+		mnt->mnt_mountpoint = mnt->mnt_root;
+		mnt->mnt_parent = mnt;
+
+		if (flag & CL_SLAVE) {
+			list_add(&mnt->mnt_slave, &old->mnt_slave_list);
+			mnt->mnt_master = old;
+			CLEAR_MNT_SHARED(mnt);
+		} else if (!(flag & CL_PRIVATE)) {
+			if ((flag & CL_MAKE_SHARED) || IS_MNT_SHARED(old))
+				list_add(&mnt->mnt_share, &old->mnt_share);
+			if (IS_MNT_SLAVE(old))
+				list_add(&mnt->mnt_slave, &old->mnt_slave);
+			mnt->mnt_master = old->mnt_master;
+		}
+		if (flag & CL_MAKE_SHARED)
+			set_mnt_shared(mnt);
+
+		/* stick the duplicate mount on the same expiry list
+		 * as the original if that was on one */
+		if (flag & CL_EXPIRE) {
+			if (!list_empty(&old->mnt_expire))
+				list_add(&mnt->mnt_expire, &old->mnt_expire);
+		}
 	}
-
-	mnt->mnt_flags = old->mnt_flags & ~MNT_WRITE_HOLD;
-	atomic_inc(&sb->s_active);
-	mnt->mnt_sb = sb;
-	mnt->mnt_root = dget(root);
-	mnt->mnt_mountpoint = mnt->mnt_root;
-	mnt->mnt_parent = mnt;
-
-	if (flag & CL_SLAVE) {
-		list_add(&mnt->mnt_slave, &old->mnt_slave_list);
-		mnt->mnt_master = old;
-		CLEAR_MNT_SHARED(mnt);
-	} else if (!(flag & CL_PRIVATE)) {
-		if ((flag & CL_MAKE_SHARED) || IS_MNT_SHARED(old))
-			list_add(&mnt->mnt_share, &old->mnt_share);
-		if (IS_MNT_SLAVE(old))
-			list_add(&mnt->mnt_slave, &old->mnt_slave);
-		mnt->mnt_master = old->mnt_master;
-	}
-	if (flag & CL_MAKE_SHARED)
-		set_mnt_shared(mnt);
-
-	/* stick the duplicate mount on the same expiry list
-	 * as the original if that was on one */
-	if (flag & CL_EXPIRE) {
-		if (!list_empty(&old->mnt_expire))
-			list_add(&mnt->mnt_expire, &old->mnt_expire);
-	}
-
 	return mnt;
 
  out_free:
 	free_vfsmnt(mnt);
-	return ERR_PTR(err);
+	return NULL;
 }
 
 static inline void mntfree(struct vfsmount *mnt)
@@ -1420,12 +1416,11 @@ struct vfsmount *copy_tree(struct vfsmount *mnt, struct dentry *dentry,
 	struct path path;
 
 	if (!(flag & CL_COPY_ALL) && IS_MNT_UNBINDABLE(mnt))
-		return ERR_PTR(-EINVAL);
+		return NULL;
 
 	res = q = clone_mnt(mnt, dentry, flag);
-	if (IS_ERR(q))
-		return q;
-
+	if (!q)
+		goto Enomem;
 	q->mnt_mountpoint = mnt->mnt_mountpoint;
 
 	p = mnt;
@@ -1446,8 +1441,8 @@ struct vfsmount *copy_tree(struct vfsmount *mnt, struct dentry *dentry,
 			path.mnt = q;
 			path.dentry = p->mnt_mountpoint;
 			q = clone_mnt(p, p->mnt_root, flag);
-			if (IS_ERR(q))
-				goto out;
+			if (!q)
+				goto Enomem;
 			br_write_lock(&vfsmount_lock);
 			list_add_tail(&q->mnt_list, &res->mnt_list);
 			attach_mnt(q, &path);
@@ -1455,7 +1450,7 @@ struct vfsmount *copy_tree(struct vfsmount *mnt, struct dentry *dentry,
 		}
 	}
 	return res;
-out:
+Enomem:
 	if (res) {
 		LIST_HEAD(umount_list);
 		br_write_lock(&vfsmount_lock);
@@ -1463,10 +1458,8 @@ out:
 		br_write_unlock(&vfsmount_lock);
 		release_mounts(&umount_list);
 	}
-	return q;
+	return NULL;
 }
-
-/* Caller should check returned pointer for errors */
 
 struct vfsmount *collect_mounts(struct path *path)
 {
@@ -1474,8 +1467,6 @@ struct vfsmount *collect_mounts(struct path *path)
 	down_write(&namespace_sem);
 	tree = copy_tree(path->mnt, path->dentry, CL_COPY_ALL | CL_PRIVATE);
 	up_write(&namespace_sem);
-	if (IS_ERR(tree))
-		return NULL;
 	return tree;
 }
 
@@ -1768,15 +1759,14 @@ static int do_loopback(struct path *path, char *old_name,
 	if (!check_mnt(path->mnt) || !check_mnt(old_path.mnt))
 		goto out2;
 
+	err = -ENOMEM;
 	if (recurse)
 		mnt = copy_tree(old_path.mnt, old_path.dentry, 0);
 	else
 		mnt = clone_mnt(old_path.mnt, old_path.dentry, 0);
 
-	if (IS_ERR(mnt)) {
-		err = PTR_ERR(mnt);
-		goto out;
-	}
+	if (!mnt)
+		goto out2;
 
 	err = graft_tree(mnt, path);
 	if (err) {
@@ -2386,10 +2376,10 @@ static struct mnt_namespace *dup_mnt_ns(struct mnt_namespace *mnt_ns,
 	/* First pass: copy the tree topology */
 	new_ns->root = copy_tree(mnt_ns->root, mnt_ns->root->mnt_root,
 					CL_COPY_ALL | CL_EXPIRE);
-	if (IS_ERR(new_ns->root)) {
+	if (!new_ns->root) {
 		up_write(&namespace_sem);
 		kfree(new_ns);
-		return ERR_CAST(new_ns->root);
+		return ERR_PTR(-ENOMEM);
 	}
 	br_write_lock(&vfsmount_lock);
 	list_add_tail(&new_ns->list, &new_ns->root->mnt_list);
