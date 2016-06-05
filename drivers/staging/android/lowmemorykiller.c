@@ -218,7 +218,7 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 		if(lmk_kill_info)
 			sprintf(lmk_kill_info, "%ul,%s,%d,%d\n",	lmk_count,
 													selected->comm,
-													selected_oom_adj,
+													selected_oom_score_adj,
 													selected_tasksize);
 //<!-- END: hyeongseok.kim@lge.com 2012-08-16 -->
 
