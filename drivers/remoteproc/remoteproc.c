@@ -39,15 +39,8 @@
 #include <linux/uaccess.h>
 #include <linux/elf.h>
 #include <linux/elfcore.h>
+#include <linux/kthread.h>
 #include <plat/remoteproc.h>
-
-#define SENSOR_POWER_OFF
-
-#ifdef SENSOR_POWER_OFF
-// Sensor Power off for recovery
-#include <linux/gpio.h>
-// Sensor Power off for recovery
-#endif
 
 /* list of available remote processors on this board */
 static LIST_HEAD(rprocs);
@@ -84,28 +77,20 @@ static ssize_t rproc_format_trace_buf(char __user *userbuf, size_t count,
 	if (pos == 0)
 		*ppos = w_pos;
 
-	for (i = w_pos; i < size && buf[i]; i++)
-		;
+	for (i = w_pos; i < size && buf[i]; i++);
 
 	if (i > w_pos)
-		num_copied = simple_read_from_buffer(userbuf, count,
-							ppos, src, i);
+		num_copied = simple_read_from_buffer(userbuf, count, ppos, src, i);
 		if (!num_copied) {
 			from_beg = 1;
 			*ppos = 0;
 		} else
 			return num_copied;
 print_beg:
-	/* LGE_SJIT 2012-01-25 [dojip.kim@lge.com]
-	 * can not access the trace buffer out of range
-	 * so need to verify 'i < size'
-	 */
-	for (i = 0; i < w_pos && i < size && buf[i]; i++)
-		;
+	for (i = 0; i < w_pos && buf[i]; i++);
 
 	if (i) {
-		num_copied = simple_read_from_buffer(userbuf, count,
-							ppos, src, i);
+		num_copied = simple_read_from_buffer(userbuf, count, ppos, src, i);
 		if (!num_copied)
 			from_beg = 0;
 		return num_copied;
@@ -272,8 +257,9 @@ static int setup_rproc_elf_core_dump(struct core_rproc *d)
 {
 	short __phnum;
 	struct elf_phdr *nphdr;
-	struct exc_regs *xregs;
-	struct pt_regs *regs;
+	struct exc_regs *xregs = d->rproc->cdump_buf1;
+	struct pt_regs *regs =
+		(struct pt_regs *)&d->core.core_note.prstatus.pr_reg;
 
 	memset(&d->core.elf, 0, sizeof(d->core.elf));
 
@@ -308,12 +294,8 @@ static int setup_rproc_elf_core_dump(struct core_rproc *d)
 	d->core.core_note.note_prstatus.n_type = NT_PRSTATUS;
 	memcpy(d->core.core_note.name, CORE_STR, sizeof(CORE_STR));
 
-	/* fill in registers for ipu only, dsp yet to be supported */
-	if (!strcmp(d->rproc->name, "ipu")) {
-		xregs = d->rproc->cdump_buf1;
-		regs = (struct pt_regs *)&d->core.core_note.prstatus.pr_reg;
-		remoteproc_fill_pt_regs(regs, xregs);
-	}
+	remoteproc_fill_pt_regs(regs, xregs);
+
 	/* We ignore the NVIC registers for now */
 
 	d->offset = sizeof(struct core);
@@ -778,9 +760,11 @@ static int rproc_add_mem_entry(struct rproc *rproc, struct fw_resource *rsc)
 		 * carveouts we don't care about in a core dump.
 		 * Perhaps the ION carveout should be reported as RSC_DEVMEM.
 		 */
-		me->core = (rsc->type == RSC_CARVEOUT &&
-				strcmp(rsc->name, "IPU_MEM_IOBUFS") &&
-				strcmp(rsc->name, "DSP_MEM_IOBUFS"));
+#ifdef CONFIG_VIDEO_OMAP_DCE
+		me->core = (rsc->type == RSC_CARVEOUT && rsc->pa != 0x80000000);
+#else
+		me->core = (rsc->type == RSC_CARVEOUT && rsc->pa != 0xbe900000);
+#endif
 #endif
 	}
 
@@ -817,7 +801,8 @@ static int rproc_check_poolmem(struct rproc *rproc, u32 size, phys_addr_t pa)
 	}
 
 	if (pa < pool->st_base || pa + size > pool->st_base + pool->st_size) {
-		pr_warn("section size does not fit within carveout memory\n");
+		pr_warn("section size does not fit within carveout memory pa(0x%x:0x%x) pool(0x%x:0x%x)\n",
+			pa, size, pool->st_base, pool->st_size);
 		return -ENOSPC;
 	}
 
@@ -834,7 +819,6 @@ static int rproc_handle_resources(struct rproc *rproc, struct fw_resource *rsc,
 	u64 trace_da1 = 0;
 	u64 cdump_da0 = 0;
 	u64 cdump_da1 = 0;
-	u64 susp_addr = 0;
 	int ret = 0;
 
 	while (len >= sizeof(*rsc) && !ret) {
@@ -885,9 +869,6 @@ static int rproc_handle_resources(struct rproc *rproc, struct fw_resource *rsc,
 		case RSC_BOOTADDR:
 			*bootaddr = da;
 			break;
-		case RSC_SUSPENDADDR:
-			susp_addr = da;
-			break;
 		case RSC_DEVMEM:
 			ret = rproc_add_mem_entry(rproc, rsc);
 			if (ret) {
@@ -906,14 +887,11 @@ static int rproc_handle_resources(struct rproc *rproc, struct fw_resource *rsc,
 				}
 				rsc->pa = pa;
 			} else {
+#ifdef CONFIG_VIDEO_OMAP_DCE
+				if (strcmp(rsc->name, "IPU_MEM_IOBUFS") != 0)
+#endif
 				ret = rproc_check_poolmem(rproc, rsc->len, pa);
-				/*
-				 * ignore the error for DSP buffers as they can
-				 * not be assigned together with rest of dsp
-				 * pool memory
-				 */
-				if (ret &&
-					strcmp(rsc->name, "DSP_MEM_IOBUFS")) {
+				if (ret) {
 					dev_err(dev, "static memory for %s "
 						"doesn't belong to poolmem\n",
 						rsc->name);
@@ -1031,9 +1009,6 @@ static int rproc_handle_resources(struct rproc *rproc, struct fw_resource *rsc,
 			goto error;
 		}
 	}
-	/* post-process pm data types */
-	if (susp_addr)
-		ret = rproc->ops->pm_init(rproc, susp_addr);
 
 error:
 	if (ret && rproc->dbg_dir) {
@@ -1083,8 +1058,9 @@ static int rproc_process_fw(struct rproc *rproc, struct fw_section *section,
 			ret = rproc_handle_resources(rproc,
 					(struct fw_resource *) section->content,
 					len, bootaddr);
-			if (ret)
+			if (ret) {
 				break;
+			}
 		}
 
 		if (section->type <= FW_DATA) {
@@ -1125,15 +1101,24 @@ exit:
 	return ret;
 }
 
-static void rproc_loader_cont(const struct firmware *fw, void *context)
+static void rproc_loader_defered(struct rproc *rproc)
 {
-	struct rproc *rproc = context;
+	const struct firmware *fw;
 	struct device *dev = rproc->dev;
 	const char *fwfile = rproc->firmware;
 	u64 bootaddr = 0;
 	struct fw_header *image;
 	struct fw_section *section;
-	int left, ret = -EINVAL;
+	int left, ret;
+	int count = 15;
+
+	/* wait until udev is up */
+	while (kobject_uevent(&dev->kobj, KOBJ_CHANGE))
+		msleep(1000);
+
+	/* sometimes FS is not mount yet, keep trying requesing the firmware */
+	while (request_firmware(&fw, fwfile, dev) && --count)
+		msleep(1000);
 
 	if (!fw) {
 		dev_err(dev, "%s: failed to load %s\n", __func__, fwfile);
@@ -1155,7 +1140,7 @@ static void rproc_loader_cont(const struct firmware *fw, void *context)
 		goto out;
 	}
 
-	dev_dbg(dev, "BIOS image version is %d\n", image->version);
+	dev_info(dev, "BIOS image version is %d\n", image->version);
 
 	rproc->header = kzalloc(image->header_len, GFP_KERNEL);
 	if (!rproc->header) {
@@ -1180,10 +1165,6 @@ static void rproc_loader_cont(const struct firmware *fw, void *context)
 
 	left = fw->size - sizeof(struct fw_header) - image->header_len;
 
-	/* event currently used to bump the remoteproc to max freq
-	 * while booting.  */
-	_event_notify(rproc, RPROC_PRELOAD, NULL);
-
 	ret = rproc_process_fw(rproc, section, left, &bootaddr);
 	if (ret) {
 		dev_err(dev, "Failed to process the image: %d\n", ret);
@@ -1197,15 +1178,12 @@ out:
 complete_fw:
 	/* allow all contexts calling rproc_put() to proceed */
 	complete_all(&rproc->firmware_loading_complete);
-	if (ret)
-		_event_notify(rproc, RPROC_LOAD_ERROR, NULL);
 }
 
 static int rproc_loader(struct rproc *rproc)
 {
 	const char *fwfile = rproc->firmware;
 	struct device *dev = rproc->dev;
-	int ret;
 
 	if (!fwfile) {
 		dev_err(dev, "%s: no firmware to load\n", __func__);
@@ -1216,12 +1194,7 @@ static int rproc_loader(struct rproc *rproc)
 	 * allow building remoteproc as built-in kernel code, without
 	 * hanging the boot process
 	 */
-	ret = request_firmware_nowait(THIS_MODULE, FW_ACTION_HOTPLUG, fwfile,
-			dev, GFP_KERNEL, rproc, rproc_loader_cont);
-	if (ret < 0) {
-		dev_err(dev, "request_firmware_nowait failed: %d\n", ret);
-		return ret;
-	}
+	kthread_run((void *)rproc_loader_defered, rproc, "rproc_loader");
 
 	return 0;
 }
@@ -1308,13 +1281,6 @@ struct rproc *rproc_get(const char *name)
 	struct rproc *rproc, *ret = NULL;
 	struct device *dev;
 	int err;
-#ifdef SENSOR_POWER_OFF     
-    // Sensor Power off for recovery
-    u32 gpio_id;    
-    int gpio_num[3] = {24, 15, 22}; // sensor power gpio
-    int gpioRet, i;
-    // Sensor Power off for recovery
-#endif
 
 	rproc = __find_rproc_by_name(name);
 	if (!rproc) {
@@ -1355,23 +1321,6 @@ struct rproc *rproc_get(const char *name)
 	init_completion(&rproc->firmware_loading_complete);
 
 	dev_info(dev, "powering up %s\n", name);
-
-#ifdef SENSOR_POWER_OFF 
-    // Sensor Power off for recovery
-    for (i = 0; i < 3; i++) {
-        gpio_id = gpio_num[i];
-        gpio_free(gpio_id);
-        gpioRet = gpio_request(gpio_id, "ducati recovery");
-        if (!gpioRet) {
-            printk("Sensor power off gpio%d request success\n", gpio_id);
-            gpio_direction_output(gpio_id, 0);
-            gpio_free(gpio_id);
-        } else {
-            printk("Sensor power off gpio%d request fail %d\n", gpio_id, ret);
-        }
-    }
-    //Sensor Power off for recovery
-#endif
 
 	err = rproc_loader(rproc);
 	if (err) {

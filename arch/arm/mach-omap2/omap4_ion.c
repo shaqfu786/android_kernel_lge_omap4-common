@@ -97,38 +97,56 @@ void __init omap_ion_init(void)
 {
 	int i;
 	int ret;
-	u32 nonsecure = omap4_ion_pdata.nonsecure_tiler2d_size;
 
 	system_512m = (omap_total_ram_size() == SZ_512M);
 
 	/* carveout sizes */
-	omap4_smc_size = (SZ_1M * 3);
+#ifdef CONFIG_MACH_LGE_COSMO
+	omap4_smc_size = 0;
+#else
+	omap4_smc_size = (SZ_1M * 2);
+#endif
 
 	if (system_512m) {
 		omap4_ion_heap_secure_input_size = 0;
-		omap4_ducati_heap_size = (SZ_1M * 83);
+#ifdef CONFIG_MACH_LGE_COSMO
+		omap4_ducati_heap_size = (SZ_1M * 85);
+#else
+		omap4_ducati_heap_size = (SZ_1M * 55);
+#endif
 		omap4_ion_heap_nonsec_tiler_mem_size = 0;
 		omap4_ion_heap_tiler_mem_size = 0;
-	} else {
-		omap4_ion_heap_secure_input_size = (SZ_1M * 90);
-		omap4_ducati_heap_size = (SZ_1M * 105);
-		omap4_ion_heap_nonsec_tiler_mem_size = nonsecure;
-		omap4_ion_heap_tiler_mem_size =
-					 (ALIGN(omap4_ion_pdata.tiler2d_size +
-					 nonsecure, SZ_2M) - nonsecure);
-	}
+        } else {
+                omap4_ion_heap_secure_input_size = (SZ_1M * 20);
+                omap4_ducati_heap_size = (SZ_1M * 128);
+                /* Reducing carveout sizes used by ION. The expectation is
+                 * the memory will be dynamically allocated for tiler
+                 * instead of being carveout at start
+                 */
+                omap4_ion_heap_nonsec_tiler_mem_size = SZ_4K;
+                omap4_ion_heap_tiler_mem_size = SZ_4K;
+        }
 
 	/* carveout addresses */
-	omap4_smc_addr = PLAT_PHYS_OFFSET + omap_total_ram_size() -
-				omap4_smc_size;
-	omap4_ion_heap_secure_input_addr = omap4_smc_addr -
-				omap4_ion_heap_secure_input_size;
-	omap4_ducati_heap_addr = omap4_ion_heap_secure_input_addr -
-				omap4_ducati_heap_size;
-	omap4_ion_heap_tiler_mem_addr = omap4_ducati_heap_addr -
-				omap4_ion_heap_tiler_mem_size;
-	omap4_ion_heap_nonsec_tiler_mem_addr = omap4_ion_heap_tiler_mem_addr -
-				omap4_ion_heap_nonsec_tiler_mem_size;
+	if (system_512m) {
+		omap4_ducati_heap_addr = PLAT_PHYS_OFFSET + omap_total_ram_size() - omap4_ducati_heap_size;
+		omap4_smc_addr = omap4_ducati_heap_addr - omap4_smc_size;
+		omap4_ion_heap_secure_input_addr = omap4_smc_addr - omap4_ion_heap_secure_input_size;
+		omap4_ion_heap_tiler_mem_addr = omap4_ion_heap_secure_input_addr - omap4_ion_heap_tiler_mem_size;
+		omap4_ion_heap_nonsec_tiler_mem_addr = omap4_ion_heap_tiler_mem_addr -
+					omap4_ion_heap_nonsec_tiler_mem_size;
+	} else {
+		omap4_smc_addr = PLAT_PHYS_OFFSET + omap_total_ram_size() -
+					omap4_smc_size;
+		omap4_ion_heap_secure_input_addr = omap4_smc_addr -
+					omap4_ion_heap_secure_input_size;
+		omap4_ducati_heap_addr = omap4_ion_heap_secure_input_addr -
+					omap4_ducati_heap_size;
+		omap4_ion_heap_tiler_mem_addr = omap4_ducati_heap_addr -
+					omap4_ion_heap_tiler_mem_size;
+		omap4_ion_heap_nonsec_tiler_mem_addr = omap4_ion_heap_tiler_mem_addr -
+					omap4_ion_heap_nonsec_tiler_mem_size;
+	}
 
 	pr_info("omap4_total_ram_size = 0x%x\n" \
 				"omap4_smc_size = 0x%x\n"  \
@@ -183,6 +201,12 @@ void __init omap_ion_init(void)
 		    omap4_ion_data.heaps[i].type == OMAP_ION_HEAP_TYPE_TILER) {
 			ret = memblock_remove(omap4_ion_data.heaps[i].base,
 					      omap4_ion_data.heaps[i].size);
+
+			pr_debug("%s: ion_heap[%d] name=%s, size=%dMB, addr=0x%lx\n",
+				__func__, i, omap4_ion_data.heaps[i].name,
+				(omap4_ion_data.heaps[i].size >> 20),
+				omap4_ion_data.heaps[i].base);
+
 			if (!omap4_ion_data.heaps[i].size)
 				continue;
 			if (ret)
