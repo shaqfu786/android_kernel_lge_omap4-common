@@ -134,13 +134,11 @@ static void ion_handle_destroy(struct kref *kref)
 	/* XXX Can a handle be destroyed while it's map count is non-zero?:
 	   if (handle->map_cnt) unmap
 	 */
-	WARN_ON(handle->kmap_cnt || handle->dmap_cnt || handle->usermap_cnt);
 	ion_buffer_put(handle->buffer);
-//120817 jaeshin.lee@lge.com gpu: ion: Fix race condition with ion_import	
-//	mutex_lock(&handle->client->lock);
+	mutex_lock(&handle->client->lock);
 	if (!RB_EMPTY_NODE(&handle->node))
 		rb_erase(&handle->node, &handle->client->handles);
-//	mutex_unlock(&handle->client->lock);
+	mutex_unlock(&handle->client->lock);
 	kfree(handle);
 }
 
@@ -304,16 +302,13 @@ void ion_free(struct ion_client *client, struct ion_handle *handle)
 
 	mutex_lock(&client->lock);
 	valid_handle = ion_handle_validate(client, handle);
-//120817 jaeshin.lee@lge.com gpu: ion: Fix race condition with ion_import 
-//	mutex_unlock(&client->lock);
+	mutex_unlock(&client->lock);
 
 	if (!valid_handle) {
 		WARN("%s: invalid handle passed to free.\n", __func__);
-		mutex_unlock(&client->lock);		
 		return;
 	}
 	ion_handle_put(handle);
-	mutex_unlock(&client->lock);		
 }
 EXPORT_SYMBOL(ion_free);
 
@@ -375,14 +370,20 @@ int ion_phys(struct ion_client *client, struct ion_handle *handle,
 }
 EXPORT_SYMBOL(ion_phys);
 
-#ifdef CONFIG_VIDEO_OMAP_DCE
-int ion_handle_phys(struct ion_handle *handle,
-	ion_phys_addr_t *addr, size_t *len)
+int ion_phys_frm_buffer(struct ion_buffer *buffer,
+	     ion_phys_addr_t *addr, size_t *len)
 {
-	return ion_phys(handle->client, handle, addr, len);
+	int ret;
+
+	if (!buffer->heap->ops->phys) {
+		pr_err("%s: ion_phys is not implemented by this heap.\n",
+		       __func__);
+		return -ENODEV;
+	}
+	ret = buffer->heap->ops->phys(buffer->heap, buffer, addr, len);
+	return ret;
 }
-EXPORT_SYMBOL(ion_handle_phys);
-#endif
+EXPORT_SYMBOL(ion_phys_frm_buffer);
 
 int ion_phys_frm_dev(struct ion_device *dev, struct ion_handle *handle,
 	     ion_phys_addr_t *addr, size_t *len)
@@ -572,8 +573,8 @@ struct ion_handle *ion_import_fd(struct ion_client *client, int fd)
 		return ERR_PTR(-EINVAL);
 	}
 	if (file->f_op != &ion_share_fops) {
-		pr_err("%s: imported file %s is not a shared ion"
-			" file.", __func__, file->f_dentry->d_name.name);
+		pr_err("%s: imported file is not a shared ion file.\n",
+		       __func__);
 		handle = ERR_PTR(-EINVAL);
 		goto end;
 	}
@@ -775,8 +776,7 @@ static int ion_client_put(struct ion_client *client)
 
 void ion_client_destroy(struct ion_client *client)
 {
-	if (client)
-		ion_client_put(client);
+	ion_client_put(client);
 }
 EXPORT_SYMBOL(ion_client_destroy);
 
@@ -803,13 +803,10 @@ static void ion_vma_open(struct vm_area_struct *vma)
 	/* check that the client still exists and take a reference so
 	   it can't go away until this vma is closed */
 	client = ion_client_lookup(buffer->dev, current->group_leader);
-
 	if (IS_ERR_OR_NULL(client)) {
 		vma->vm_private_data = NULL;
 		return;
 	}
-//120817 jaeshin.lee@lge.com 	https://github.com/Albinoman887/bricked-pyramid-3.0/commit/dc5e2b81a7383a16999407e854fd80c6e67f2e62
-	ion_handle_get(handle);	
 	pr_debug("%s: %d client_cnt %d handle_cnt %d alloc_cnt %d\n",
 		 __func__, __LINE__,
 		 atomic_read(&client->ref.refcount),
@@ -827,19 +824,14 @@ static void ion_vma_close(struct vm_area_struct *vma)
 	/* this indicates the client is gone, nothing to do here */
 	if (!handle)
 		return;
-		
 	client = handle->client;
 	pr_debug("%s: %d client_cnt %d handle_cnt %d alloc_cnt %d\n",
 		 __func__, __LINE__,
 		 atomic_read(&client->ref.refcount),
 		 atomic_read(&handle->ref.refcount),
 		 atomic_read(&buffer->ref.refcount));
-//120817 jaeshin.lee@lge.com gpu: ion: Fix race condition with ion_import 
-	mutex_lock(&client->lock);		 
 	ion_handle_put(handle);
-	mutex_unlock(&client->lock);
 	ion_client_put(client);
-
 	pr_debug("%s: %d client_cnt %d handle_cnt %d alloc_cnt %d\n",
 		 __func__, __LINE__,
 		 atomic_read(&client->ref.refcount),
@@ -916,10 +908,7 @@ static int ion_share_mmap(struct file *file, struct vm_area_struct *vma)
 
 err1:
 	/* drop the reference to the handle */
-//120817 jaeshin.lee@lge.com gpu: ion: Fix race condition with ion_import 
-	mutex_lock(&client->lock);
 	ion_handle_put(handle);
-	mutex_unlock(&client->lock);
 err:
 	/* drop the reference to the client */
 	ion_client_put(client);
