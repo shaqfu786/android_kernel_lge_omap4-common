@@ -859,16 +859,16 @@ static void display_gamma_delayed_work(struct work_struct *work)
 //CHANGE_E mo2mk.kim@lge.com 2012-07-26 apply kcal code for gamma
 
 extern int dispc_set_gamma_rgb(enum omap_channel ch, u8 gamma,int red,int green,int blue);
+static int red = 255,green = 255,blue = 255;
 static ssize_t display_gamma_tuning_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
-	return 0;
+	return snprintf(buf, PAGE_SIZE, "%d,%d,%d",red,green,blue);
 }
 static ssize_t display_gamma_tuning_store(struct device *dev,
 		struct device_attribute *attr,
 		const char *buf, size_t size)
 {
-	int red,green,blue;
 //CHANGE_S mo2mk.kim@lge.com 2012-07-26 apply kcal code for gamma
 #if defined(CONFIG_COSMO_GAMMA)	
 	lge_gamma_rgb_data_from_nv2();
